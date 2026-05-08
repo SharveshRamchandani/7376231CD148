@@ -1,6 +1,6 @@
 type NotificationType = "Placement" | "Result" | "Event" | string;
 
-interface Notification {
+interface InboxNotification {
   id?: string;
   type?: NotificationType;
   message?: string;
@@ -11,7 +11,7 @@ interface Notification {
 }
 
 interface ScoredNotification {
-  notification: Notification;
+  notification: InboxNotification;
   score: number;
   baseScore: number;
   recencyScore: number;
@@ -21,7 +21,7 @@ interface ScoredNotification {
 const NOTIFICATIONS_URL =
   "http://4.224.186.213/evaluation-service/notifications";
 const AUTH_TOKEN =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJNYXBDbGFpbXMiOnsiYXVkIjoiaHR0cDovLzIwLjI0NC41Ni4xNDQvZXZhbHVhdGlvbi1zZXJ2aWNlIiwiZW1haWwiOiJzaGFydmVzaC5jZDIzQGJpdHNhdGh5LmFjLmluIiwiZXhwIjoxNzc4MjMxOTk3LCJpYXQiOjE3NzgyMzEwOTcsImlzcyI6IkFmZm9yZCBNZWRpY2FsIFRlY2hub2xvZ2llcyBQcml2YXRlIExpbWl0ZWQiLCJqdGkiOiI2ZmYzYTIzZi01ZmU0LTQwMjMtOWVlNy0wOGQ5MjJiM2ExYjgiLCJsb2NhbGUiOiJlbi1JTiIsIm5hbWUiOiJzaGFydmVzaCBzIHJhbWNoYW5kYW5pIiwic3ViIjoiOTdkODA4MWItMTRkNi00YTFmLTkxMWEtOWNmOWZlZjZlMTJiIn0sImVtYWlsIjoic2hhcnZlc2guY2QyM0BiaXRzYXRoeS5hYy5pbiIsIm5hbWUiOiJzaGFydmVzaCBzIHJhbWNoYW5kYW5pIiwicm9sbE5vIjoiNzM3NjIzMWNkMTQ4IiwiYWNjZXNzQ29kZSI6InVLYUpmbSIsImNsaWVudElEIjoiOTdkODA4MWItMTRkNi00YTFmLTkxMWEtOWNmOWZlZjZlMTJiIiwiY2xpZW50U2VjcmV0IjoicFpiaEVIRlJuZHZVdVBKayJ9.UEBCh6Ntg86BkaEX5zTFi3SAQ4bN4CIPwdDQZZcGIGg";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJNYXBDbGFpbXMiOnsiYXVkIjoiaHR0cDovLzIwLjI0NC41Ni4xNDQvZXZhbHVhdGlvbi1zZXJ2aWNlIiwiZW1haWwiOiJzaGFydmVzaC5jZDIzQGJpdHNhdGh5LmFjLmluIiwiZXhwIjoxNzc4MjM1NzU0LCJpYXQiOjE3NzgyMzQ4NTQsImlzcyI6IkFmZm9yZCBNZWRpY2FsIFRlY2hub2xvZ2llcyBQcml2YXRlIExpbWl0ZWQiLCJqdGkiOiI3ZDc2MGUyZC0xZWYyLTRmMDQtOGViYS1iNzAwZDZjNmU0ZWUiLCJsb2NhbGUiOiJlbi1JTiIsIm5hbWUiOiJzaGFydmVzaCBzIHJhbWNoYW5kYW5pIiwic3ViIjoiOTdkODA4MWItMTRkNi00YTFmLTkxMWEtOWNmOWZlZjZlMTJiIn0sImVtYWlsIjoic2hhcnZlc2guY2QyM0BiaXRzYXRoeS5hYy5pbiIsIm5hbWUiOiJzaGFydmVzaCBzIHJhbWNoYW5kYW5pIiwicm9sbE5vIjoiNzM3NjIzMWNkMTQ4IiwiYWNjZXNzQ29kZSI6InVLYUpmbSIsImNsaWVudElEIjoiOTdkODA4MWItMTRkNi00YTFmLTkxMWEtOWNmOWZlZjZlMTJiIiwiY2xpZW50U2VjcmV0IjoicFpiaEVIRlJuZHZVdVBKayJ9.40C5lYA9fwirj_Z6GIANn_SZORuxnoZ8T-11w2biWSo";
 
 const TYPE_SCORES: Record<string, number> = {
   Placement: 3,
@@ -37,7 +37,7 @@ function getBaseScore(type?: NotificationType): number {
   return TYPE_SCORES[type] ?? 0;
 }
 
-function getTimestampMs(notification: Notification): number {
+function getTimestampMs(notification: InboxNotification): number {
   const rawTimestamp = notification.timestamp ?? notification.createdAt;
   if (!rawTimestamp) {
     return 0;
@@ -60,7 +60,9 @@ function getRecencyScore(timestampMs: number, newestTimestampMs: number): number
   return 1 / (1 + diffMinutes);
 }
 
-function scoreNotifications(notifications: Notification[]): ScoredNotification[] {
+function scoreNotifications(
+  notifications: InboxNotification[],
+): ScoredNotification[] {
   const newestTimestampMs = notifications.reduce((latest, notification) => {
     return Math.max(latest, getTimestampMs(notification));
   }, 0);
@@ -80,7 +82,7 @@ function scoreNotifications(notifications: Notification[]): ScoredNotification[]
   });
 }
 
-async function fetchNotifications(): Promise<Notification[]> {
+async function fetchNotifications(): Promise<InboxNotification[]> {
   const response = await fetch(NOTIFICATIONS_URL, {
     method: "GET",
     headers: {
@@ -98,7 +100,7 @@ async function fetchNotifications(): Promise<Notification[]> {
   const payload = (await response.json()) as unknown;
 
   if (Array.isArray(payload)) {
-    return payload as Notification[];
+    return payload as InboxNotification[];
   }
 
   if (
@@ -107,7 +109,7 @@ async function fetchNotifications(): Promise<Notification[]> {
     "notifications" in payload &&
     Array.isArray((payload as { notifications?: unknown }).notifications)
   ) {
-    return (payload as { notifications: Notification[] }).notifications;
+    return (payload as { notifications: InboxNotification[] }).notifications;
   }
 
   throw new Error("Unexpected notifications response format.");
